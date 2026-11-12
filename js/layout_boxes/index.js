@@ -19,7 +19,7 @@ import { isVueNodes } from "../shared/nodes2.mjs";
 import { onRendererChange } from "../shared/renderer_switch.mjs";
 import { onRouterChanged } from "../shared/router_changed.mjs";
 import { runTab, eachRestoredOutput } from "../shared/run_tab.mjs";
-import { CLASS, HIDDEN_INPUT, injectedState } from "./core.mjs";
+import { CLASSES, HIDDEN_INPUT, injectedState, isAdv, promptInput, readState } from "./core.mjs";
 import { closeBig, openBig } from "./big.mjs";
 import { LAYOUT_BOXES_HELP } from "./help.mjs";
 import { canvasDims, loadPicture, pictureWired, runSource, upstreamPicture } from "./source.mjs";
@@ -29,8 +29,10 @@ const DEFAULT_W = 440;
 const DEFAULT_H = 600;
 const POLL_MS = 700;
 
-registerNodeHelp(CLASS, LAYOUT_BOXES_HELP);
-registerNodeAccent(CLASS, { title: "Layout Boxes" });
+for (const cls of CLASSES) {
+  registerNodeHelp(cls, LAYOUT_BOXES_HELP);
+  registerNodeAccent(cls, { title: cls === CLASSES[0] ? "Layout Boxes" : "Layout Boxes Advanced" });
+}
 
 // ── the background picture and the canvas shape ────────────────────────────
 function repaintAll(node) {
@@ -100,11 +102,11 @@ app.registerExtension({
 
   // A Run that ended while another workflow tab was open (js/shared/run_tab.mjs).
   onNodeOutputsUpdated(nodeOutputs) {
-    eachRestoredOutput(nodeOutputs, CLASS, (node, output) => applyRun(node, output));
+    for (const cls of CLASSES) eachRestoredOutput(nodeOutputs, cls, (node, output) => applyRun(node, output));
   },
 
   beforeRegisterNodeDef(nodeType, nodeData) {
-    if (nodeData?.name !== CLASS) return;
+    if (!CLASSES.includes(nodeData?.name)) return;
     if (nodeType.prototype._pixLybPatched) return;
     nodeType.prototype._pixLybPatched = true;
 
@@ -114,6 +116,7 @@ app.registerExtension({
       const node = this;
       buildFace(node, { onExpand: () => openBig(node) });
       node._pixLybRefresh = (structural) => {
+        if (structural) syncPromptInputs(node);
         renderFace(node, structural, true);
         node._pixLybBig?.refresh?.(structural);
       };
@@ -228,6 +231,26 @@ app.registerExtension({
   },
 });
 
+// ── Advanced: one STRING socket per Prompt box ─────────────────────────────
+// Added and removed on user actions only; the sockets and their links are
+// saved with the workflow like any other input.
+function syncPromptInputs(node) {
+  if (!isAdv(node)) return;
+  const want = new Map();
+  readState(node).boxes.forEach((b, i) => {
+    if (b.type === "prompt" && b.pid) want.set(promptInput(b), `box ${i + 1} prompt`);
+  });
+  const inputs = node.inputs || [];
+  for (let i = inputs.length - 1; i >= 0; i--) {
+    if (/^prompt_\d+$/.test(inputs[i].name) && !want.has(inputs[i].name)) node.removeInput(i);
+  }
+  for (const [name, label] of want) {
+    if (!node.inputs?.some((s) => s.name === name)) node.addInput(name, "STRING");
+    node.inputs.find((s) => s.name === name).label = label;
+  }
+  node.setDirtyCanvas?.(true, true);
+}
+
 // ── graphToPrompt: put the boxes into the hidden input ─────────────────────
 // Inject only - never prune: Export (API) serialises this same output.
 function buildIndex() {
@@ -238,7 +261,7 @@ function buildIndex() {
     seen.add(graph);
     for (const n of graph._nodes || graph.nodes || []) {
       if (!n) continue;
-      if (n.comfyClass === CLASS || n.type === CLASS) index.set(String(n.id), n);
+      if (CLASSES.includes(n.comfyClass) || CLASSES.includes(n.type)) index.set(String(n.id), n);
       const inner = n.subgraph || n._graph;
       if (inner && inner !== graph) visit(inner);
     }
@@ -264,7 +287,7 @@ app.graphToPrompt = async function (...args) {
       let index = null;
       for (const id in out) {
         const entry = out[id];
-        if (!entry || entry.class_type !== CLASS) continue;
+        if (!entry || !CLASSES.includes(entry.class_type)) continue;
         if (!index) index = buildIndex();
         const node = findNode(index, id);
         if (!node) continue;

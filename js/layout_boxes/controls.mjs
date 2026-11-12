@@ -9,7 +9,7 @@
 
 import { passComfyShortcut } from "../shared/text_shortcuts.mjs";
 import { followSpellcheck } from "../shared/spellcheck.mjs";
-import { MAX_DESC, MAX_TEXT, inkOn, objTag, readState, rgbaOf } from "./core.mjs";
+import { MAX_DESC, MAX_TEXT, inkOn, isAdv, objTag, readState, rgbaOf } from "./core.mjs";
 import {
   clearBoxes, deleteBox, redo, refresh, reorderBox, select, setField, setType, uiState, undo,
 } from "./actions.mjs";
@@ -153,18 +153,21 @@ export function renderList(node, host, { big = false } = {}) {
     badge.style.color = inkOn(i);
     badge.title = `Box ${i + 1}: in a FLUX.3 prompt, write ${objTag(i)} to tie words to it (MOSS needs no tags)`;
 
-    const kind = btn("pix-lyb-kind" + (b.type === "text" ? " text" : ""),
+    const adv = isAdv(node);
+    const next = b.type === "obj" ? "text" : b.type === "text" && adv ? "prompt" : "obj";
+    const kind = btn("pix-lyb-kind" + (b.type === "obj" ? "" : " " + b.type),
       b.type === "text"
-        ? "Text box: holds exact words, like a sign or a title. Click for an object box."
-        : "Object box: something in the picture. Click to make it a text box with exact words.",
+        ? `Text box: holds exact words, like a sign or a title. Click for ${adv ? "a prompt" : "an object"} box.`
+        : b.type === "prompt"
+          ? `Prompt box: an object box whose description comes from its own input, box ${i + 1} prompt. Click for an object box.`
+          : "Object box: something in the picture. Click to make it a text box with exact words.",
       "");
-    kind.textContent = b.type === "text" ? "Text" : "Obj";
+    kind.textContent = { obj: "Obj", text: "Text", prompt: "Prompt" }[b.type];
     kind.addEventListener("click", (e) => {
       e.stopPropagation();
-      const toText = b.type !== "text";
-      setType(node, i, toText ? "text" : "obj");
+      setType(node, i, next);
       // the list was just rebuilt: the words are the next thing to type
-      if (toText) focusRow(host, i);
+      if (next === "text") focusRow(host, i);
     });
 
     const words = b.type === "text"
@@ -172,10 +175,12 @@ export function renderList(node, host, { big = false } = {}) {
         "The exact words to write in this box. The model is asked to spell them as typed.",
         b.text, MAX_TEXT, (v) => setField(node, i, "text", v))
       : null;
-    const descArgs = [b.type === "text" ? "what it looks like" : "what goes here",
+    const descArgs = [b.type === "text" ? "what it looks like" : b.type === "prompt" ? `wire box ${i + 1} prompt` : "what goes here",
       b.type === "text"
         ? "How the words look: the font, colour, where they are written. Optional."
-        : "What goes in this box, like a red apple with a green leaf. One rich sentence works best.",
+        : b.type === "prompt"
+          ? `The text wired into the box ${i + 1} prompt input describes this box. What you type here is used only while nothing is wired.`
+          : "What goes in this box, like a red apple with a green leaf. One rich sentence works best.",
       b.desc, MAX_DESC, (v) => setField(node, i, "desc", v)];
     const del = btn("pix-lyb-del", "Delete this box", "×");
     del.addEventListener("click", (e) => { e.stopPropagation(); deleteBox(node, i); });

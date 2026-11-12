@@ -48,6 +48,8 @@ export function injectCSS() {
 .pix-lyb-kind:hover{border-color:${ACC};color:#ddd;}
 .pix-lyb-kind.text{background:${ACC};border-color:${ACC};color:#fff;}
 .pix-lyb-kind.text:hover{background:${ACC_HOVER};border-color:${ACC_HOVER};}
+.pix-lyb-kind.prompt{width:52px;background:#2563eb;border-color:#2563eb;color:#fff;}
+.pix-lyb-kind.prompt:hover{background:#3b82f6;border-color:#3b82f6;}
 .pix-lyb-desc,.pix-lyb-words{min-width:0;height:24px;box-sizing:border-box;background:#1d1d1d;color:#e0e0e0;
   border:1px solid #333;border-radius:4px;padding:3px 7px;font:12px "Segoe UI",sans-serif;outline:none;}
 .pix-lyb-desc{flex:1 1 auto;}

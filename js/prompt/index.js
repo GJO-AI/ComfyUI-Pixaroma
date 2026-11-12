@@ -1052,6 +1052,46 @@ function findPromptNode(index, promptId) {
 // above), so every node that rolls picks gets it by importing that module rather than
 // depending on this file having loaded.
 
+// Layout Boxes Advanced: every Prompt box must get its own pick. The same #list
+// in two Prompt nodes normally agrees within a run (nextIndex), so all Prompt
+// nodes that feed box sockets share ONE resolvers object: each use continues the
+// deck, a Shuffle deals the next card and a Random rolls again (In order stays the
+// same by design).
+function boxFedPrompts(prompt) {
+  const ids = new Set();
+  for (const c of Object.values(prompt)) {
+    if (c?.class_type !== "PixaromaLayoutBoxesAdv") continue;
+    for (const [name, link] of Object.entries(c.inputs || {})) {
+      if (/^prompt_\d+$/.test(name) && Array.isArray(link)) ids.add(String(link[0]));
+    }
+  }
+  return ids;
+}
+
+// A Prompt node wired into several Prompt boxes would run once and hand every box
+// the same pick. The first box keeps the node's own roll; every further box gets a
+// copy of the node with its own roll from the shared resolvers.
+function rollPerPromptBox(prompt, rolled) {
+  const seen = new Set();
+  for (const [cid, c] of Object.entries(prompt)) {
+    if (c?.class_type !== "PixaromaLayoutBoxesAdv") continue;
+    for (const [name, link] of Object.entries(c.inputs || {})) {
+      if (!/^prompt_\d+$/.test(name) || !Array.isArray(link)) continue;
+      const src = String(link[0]);
+      const roll = rolled.get(src);
+      if (!roll) continue;
+      if (!seen.has(src)) { seen.add(src); continue; }
+      const id = `${src}_lyb_${cid}_${name}`.replace(/:/g, "_");
+      const { st, res } = roll;
+      prompt[id] = {
+        ...prompt[src],
+        inputs: { ...prompt[src].inputs, PromptState: JSON.stringify({ text: expandAll(st.text, res).out, order: st.order, sep: st.sep }) },
+      };
+      c.inputs[name] = [id, link[1]];
+    }
+  }
+}
+
 if (!app._pixPromptToPromptPatched) {
 app._pixPromptToPromptPatched = true;
 const _origGraphToPrompt_fn = app.graphToPrompt;
@@ -1069,6 +1109,9 @@ app.graphToPrompt = async function (...args) {
       // starts) can neither have its picks spent nor steal a real run's.
       beginPickBuild(prompt);
       let index = null;
+      const rolled = new Map();
+      const boxFed = boxFedPrompts(prompt);
+      const boxRes = makeRunResolvers();
       for (const key of Object.keys(prompt)) {
         try {
           const entry = prompt[key];
@@ -1089,7 +1132,9 @@ app.graphToPrompt = async function (...args) {
           // queue time, so each run gets a fresh pick; @tags expand deterministically. A
           // different pick changes this string -> the cache key changes -> re-run (no
           // nonce needed, invariant #3).
-          const ranRes = expandAll(st.text, makeRunResolvers());
+          const res = boxFed.has(key) ? boxRes : makeRunResolvers();
+          const ranRes = expandAll(st.text, res);
+          rolled.set(key, { st, res });
           const expanded = ranRes.out;
           // Remember what this build actually produced so the expanded box can show
           // the REAL words instead of the [shuffled line: x] placeholder (users could
@@ -1111,6 +1156,7 @@ app.graphToPrompt = async function (...args) {
           console.error("Pixaroma.Prompt: graphToPrompt node failed", key, nodeErr);
         }
       }
+      rollPerPromptBox(prompt, rolled);
     }
   } catch (err) {
     console.error("Pixaroma.Prompt: graphToPrompt hook failed", err);

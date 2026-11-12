@@ -130,6 +130,8 @@ from .nodes.node_sketch import NODE_CLASS_MAPPINGS as _MAPS_SKETCH
 from .nodes.node_sketch import NODE_DISPLAY_NAME_MAPPINGS as _NAMES_SKETCH
 from .nodes.node_layout_boxes import NODE_CLASS_MAPPINGS as _MAPS_LAYOUT_BOXES
 from .nodes.node_layout_boxes import NODE_DISPLAY_NAME_MAPPINGS as _NAMES_LAYOUT_BOXES
+from .nodes.node_layout_boxes_adv import NODE_CLASS_MAPPINGS as _MAPS_LAYOUT_BOXES_ADV
+from .nodes.node_layout_boxes_adv import NODE_DISPLAY_NAME_MAPPINGS as _NAMES_LAYOUT_BOXES_ADV
 from .nodes.node_ref_images import NODE_CLASS_MAPPINGS as _MAPS_REF_IMAGES
 from .nodes.node_ref_images import NODE_DISPLAY_NAME_MAPPINGS as _NAMES_REF_IMAGES
 from .nodes.node_video_tools import NODE_CLASS_MAPPINGS as _MAPS_VIDEO_TOOLS
@@ -260,6 +262,7 @@ NODE_CLASS_MAPPINGS = {
     **_MAPS_FREE_VRAM,
     **_MAPS_SKETCH,
     **_MAPS_LAYOUT_BOXES,
+    **_MAPS_LAYOUT_BOXES_ADV,
     **_MAPS_REF_IMAGES,
     **_MAPS_VIDEO_TOOLS,
     **_MAPS_SAVE_IMAGE,
@@ -356,6 +359,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     **_NAMES_FREE_VRAM,
     **_NAMES_SKETCH,
     **_NAMES_LAYOUT_BOXES,
+    **_NAMES_LAYOUT_BOXES_ADV,
     **_NAMES_REF_IMAGES,
     **_NAMES_VIDEO_TOOLS,
     **_NAMES_SAVE_IMAGE,

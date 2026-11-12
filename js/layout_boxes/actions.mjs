@@ -63,6 +63,7 @@ function apply(op, boxes) {
       if (!b) return null;
       const old = b.type;
       b.type = op.type;
+      if (op.pid) b.pid = op.pid;
       return { kind: "type", index: op.index, type: old };
     }
     case "order": {
@@ -132,7 +133,10 @@ export function setRect(node, index, rect) {
 export function setType(node, index, type) {
   const b = readState(node).boxes[index];
   if (!b || b.type === type) return;
-  if (run(node, { kind: "type", index, type: type === "text" ? "text" : "obj" })) refresh(node, true);
+  const op = { kind: "type", index, type };
+  // A Prompt box needs a pid that no other box holds: it names its socket.
+  if (type === "prompt" && !b.pid) op.pid = Math.max(0, ...readState(node).boxes.map((x) => x.pid)) + 1;
+  if (run(node, op)) refresh(node, true);
 }
 
 /** Move box `from` to position `to` (its number changes, and so does its <obj_N>). */

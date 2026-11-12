@@ -8,7 +8,8 @@ Create Bounding Boxes node sends (comfy_extras/nodes_bounding_boxes.py
 build_elements + _norm_bbox), so FLUX.3 Layout Prompt and Build JSON Prompt
 (Ideogram) read ours the same way:
   - one dict per box, keys in this order: type ("obj" or "text"), bbox,
-    text (text boxes only), desc,
+    text (text boxes only), desc. A "prompt" box (Layout Boxes Advanced) is
+    sent as "obj": only where its desc comes from differs,
   - bbox = [ymin, xmin, ymax, xmax] on a 0..1000 grid of the CANVAS, each value
     Python round(fraction * 1000) clamped to 0..1000, ymin/ymax and xmin/xmax
     swapped when a box was stored upside down.
@@ -99,13 +100,17 @@ def parse_state(raw):
             x, y, w, h = (_num(b.get(k)) for k in ("x", "y", "w", "h"))
             if None in (x, y, w, h):
                 continue
-            etype = "text" if b.get("type") == "text" else "obj"
-            boxes.append({
+            etype = b.get("type") if b.get("type") in ("text", "prompt") else "obj"
+            box = {
                 "x": x, "y": y, "w": w, "h": h,
                 "type": etype,
                 "desc": _text(b.get("desc"), MAX_DESC),
                 "text": _text(b.get("text"), MAX_TEXT) if etype == "text" else "",
-            })
+            }
+            pid = b.get("pid")
+            if etype == "prompt" and isinstance(pid, int) and not isinstance(pid, bool) and 0 < pid <= 1000000:
+                box["pid"] = pid
+            boxes.append(box)
     return {"boxes": boxes}
 
 

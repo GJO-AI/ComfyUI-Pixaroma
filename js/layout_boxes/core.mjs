@@ -16,6 +16,14 @@
 // (actions.mjs uiState), so clicking a box can never flag a workflow modified.
 
 export const CLASS = "PixaromaLayoutBoxes";
+export const ADV_CLASS = "PixaromaLayoutBoxesAdv";
+export const CLASSES = [CLASS, ADV_CLASS];
+export const isAdv = (node) => node?.comfyClass === ADV_CLASS || node?.type === ADV_CLASS;
+
+// A Prompt box (Advanced only) takes its description from its own STRING
+// socket, named by the box's pid so the link survives a reorder or a delete.
+export const promptInput = (b) => `prompt_${b.pid}`;
+const TYPES = ["obj", "text", "prompt"];
 export const HIDDEN_INPUT = "LayoutState";
 export const PROP = "layoutBoxes";
 
@@ -63,9 +71,10 @@ function cleanBox(b) {
   const w = num(b.w);
   const h = num(b.h);
   if (x == null || y == null || w == null || h == null) return null;
-  const type = b.type === "text" ? "text" : "obj";
+  const type = TYPES.includes(b.type) ? b.type : "obj";
+  const pid = Number.isInteger(b.pid) && b.pid > 0 ? b.pid : 0;
   return {
-    x, y, w, h, type,
+    x, y, w, h, type, pid,
     // RAW, as typed: the field must keep a trailing space while you type.
     // Python trims it when the run reads it.
     desc: typeof b.desc === "string" ? b.desc.slice(0, MAX_DESC) : "",
@@ -100,8 +109,8 @@ export function writeState(node, patch) {
   node.properties[PROP] = {
     v: 1,
     boxes: next.boxes.slice(0, MAX_BOXES).map((b) => ({
-      x: b.x, y: b.y, w: b.w, h: b.h, type: b.type === "text" ? "text" : "obj",
-      desc: b.desc || "", text: b.text || "",
+      x: b.x, y: b.y, w: b.w, h: b.h, type: TYPES.includes(b.type) ? b.type : "obj",
+      desc: b.desc || "", text: b.text || "", pid: b.pid || 0,
     })),
   };
 }
@@ -113,6 +122,7 @@ export function injectedState(node) {
     boxes: readState(node).boxes.map((b) => {
       const o = { x: b.x, y: b.y, w: b.w, h: b.h, type: b.type, desc: b.desc };
       if (b.type === "text") o.text = b.text;
+      if (b.type === "prompt") o.pid = b.pid;
       return o;
     }),
   };
